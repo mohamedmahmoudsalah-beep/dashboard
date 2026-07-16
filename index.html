@@ -1,0 +1,491 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>لوحة تحكم المشاريع وتحليل البيانات</title>
+    <!-- Tailwind CSS for Modern UI -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Chart.js for beautiful charts -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <!-- PapaParse for parsing Google Sheets CSV -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.3.2/papaparse.min.js"></script>
+    <!-- FontAwesome for icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Cairo:wght@300;400;600;700&display=swap');
+        body {
+            font-family: 'Cairo', sans-serif;
+        }
+    </style>
+</head>
+<body class="bg-slate-50 text-slate-800">
+
+    <!-- Top Navigation -->
+    <nav class="bg-indigo-900 text-white shadow-md">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="flex items-center justify-between h-16">
+                <div class="flex items-center space-x-4 space-x-reverse">
+                    <span class="text-2xl"><i class="fa-solid fa-chart-line text-amber-400"></i></span>
+                    <span class="font-bold text-xl tracking-wider">نظام تحليل بيانات المشاريع</span>
+                </div>
+                <div class="flex space-x-2 space-x-reverse">
+                    <button onclick="switchTab('dashboard')" id="btn-dashboard" class="tab-btn px-4 py-2 rounded-md text-sm font-semibold bg-indigo-700 text-white">
+                        <i class="fa-solid fa-gauge-high ml-2"></i>لوحة التحكم
+                    </button>
+                    <button onclick="switchTab('data-table')" id="btn-data-table" class="tab-btn px-4 py-2 rounded-md text-sm font-semibold hover:bg-indigo-800 text-indigo-200">
+                        <i class="fa-solid fa-table ml-2"></i>جدول البيانات
+                    </button>
+                    <button onclick="switchTab('setup')" id="btn-setup" class="tab-btn px-4 py-2 rounded-md text-sm font-semibold hover:bg-indigo-800 text-indigo-200">
+                        <i class="fa-solid fa-gears ml-2"></i>طريقة الإعداد والربط
+                    </button>
+                </div>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Main Container -->
+    <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        
+        <!-- Warning Banner for Demo Data -->
+        <div id="demo-banner" class="hidden bg-amber-50 border-r-4 border-amber-500 p-4 mb-6 rounded-md shadow-sm">
+            <div class="flex items-center">
+                <div class="flex-shrink-0 text-amber-500">
+                    <i class="fa-solid fa-circle-exclamation text-xl"></i>
+                </div>
+                <div class="mr-3">
+                    <p class="text-sm text-amber-800 font-semibold">
+                        أنت تستعرض حالياً "بيانات تجريبية". لربط الموقع بملف الإكسيل الخاص بك على Google Drive، اتبع التعليمات في صفحة "طريقة الإعداد والربط".
+                    </p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Success Banner when Connected -->
+        <div id="success-banner" class="hidden bg-emerald-50 border-r-4 border-emerald-500 p-4 mb-6 rounded-md shadow-sm">
+            <div class="flex items-center">
+                <div class="flex-shrink-0 text-emerald-500">
+                    <i class="fa-solid fa-circle-check text-xl"></i>
+                </div>
+                <div class="mr-3">
+                    <p class="text-sm text-emerald-800 font-semibold">
+                        تم الاتصال بنجاح بملف الـ Google Sheets الخاص بك! يتم الآن تحديث البيانات والتحليلات تلقائياً.
+                    </p>
+                </div>
+            </div>
+        </div>
+
+        <!-- TAB 1: DASHBOARD -->
+        <section id="tab-dashboard" class="tab-content">
+            <!-- KPI Cards Row -->
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+                <!-- Card 1 -->
+                <div class="bg-white rounded-xl shadow-sm border border-slate-100 p-6 flex items-center justify-between">
+                    <div>
+                        <p class="text-sm text-slate-500 font-semibold">إجمالي الميزانية المخصصة</p>
+                        <h3 id="stat-total-budget" class="text-3xl font-bold text-slate-800 mt-1">0 ر.س</h3>
+                    </div>
+                    <div class="bg-indigo-50 text-indigo-600 p-4 rounded-full text-2xl">
+                        <i class="fa-solid fa-money-bill-wave"></i>
+                    </div>
+                </div>
+                <!-- Card 2 -->
+                <div class="bg-white rounded-xl shadow-sm border border-slate-100 p-6 flex items-center justify-between">
+                    <div>
+                        <p class="text-sm text-slate-500 font-semibold">عدد المشاريع الإجمالي</p>
+                        <h3 id="stat-total-projects" class="text-3xl font-bold text-slate-800 mt-1">0</h3>
+                    </div>
+                    <div class="bg-amber-50 text-amber-600 p-4 rounded-full text-2xl">
+                        <i class="fa-solid fa-folder-tree"></i>
+                    </div>
+                </div>
+                <!-- Card 3 -->
+                <div class="bg-white rounded-xl shadow-sm border border-slate-100 p-6 flex items-center justify-between">
+                    <div>
+                        <p class="text-sm text-slate-500 font-semibold">المشاريع المكتملة</p>
+                        <h3 id="stat-completed-projects" class="text-3xl font-bold text-slate-800 mt-1">0</h3>
+                    </div>
+                    <div class="bg-emerald-50 text-emerald-600 p-4 rounded-full text-2xl">
+                        <i class="fa-solid fa-circle-check"></i>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Charts Row -->
+            <div class="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-8">
+                <!-- Chart 1: Bar Chart -->
+                <div class="bg-white p-6 rounded-xl shadow-sm border border-slate-100">
+                    <h4 class="text-lg font-bold text-slate-800 mb-4"><i class="fa-solid fa-chart-bar text-indigo-500 ml-2"></i>ميزانية المشاريع لكل قسم</h4>
+                    <div class="relative h-80">
+                        <canvas id="budgetChart"></canvas>
+                    </div>
+                </div>
+                <!-- Chart 2: Doughnut Chart -->
+                <div class="bg-white p-6 rounded-xl shadow-sm border border-slate-100">
+                    <h4 class="text-lg font-bold text-slate-800 mb-4"><i class="fa-solid fa-chart-pie text-amber-500 ml-2"></i>توزيع المشاريع حسب الحالة</h4>
+                    <div class="relative h-80 flex justify-center">
+                        <canvas id="statusChart"></canvas>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- TAB 2: DATA TABLE -->
+        <section id="tab-data-table" class="tab-content hidden">
+            <div class="bg-white rounded-xl shadow-sm border border-slate-100 p-6">
+                <!-- Header and Filter -->
+                <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-4 mb-6">
+                    <div>
+                        <h4 class="text-lg font-bold text-slate-800">تفاصيل البيانات الخام (Raw Data)</h4>
+                        <p class="text-sm text-slate-500">استعرض وابحث في كافة المشاريع المتاحة في قاعدة البيانات</p>
+                    </div>
+                    <div class="relative max-w-xs w-full">
+                        <span class="absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none text-slate-400">
+                            <i class="fa-solid fa-magnifying-glass"></i>
+                        </span>
+                        <input type="text" id="table-search" oninput="filterTable()" placeholder="ابحث باسم المشروع أو القسم..." class="w-full pr-10 pl-4 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 text-sm">
+                    </div>
+                </div>
+
+                <!-- Table Container -->
+                <div class="overflow-x-auto">
+                    <table class="min-w-full divide-y divide-slate-100">
+                        <thead class="bg-slate-50">
+                            <tr id="table-headers">
+                                <!-- Headers will be dynamically inserted here -->
+                            </tr>
+                        </thead>
+                        <tbody id="table-body" class="divide-y divide-slate-100 bg-white text-sm text-slate-700">
+                            <!-- Rows will be dynamically inserted here -->
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </section>
+
+        <!-- TAB 3: SETUP INSTRUCTIONS -->
+        <section id="tab-setup" class="tab-content hidden">
+            <div class="bg-white rounded-xl shadow-sm border border-slate-100 p-8 max-w-4xl mx-auto">
+                <h3 class="text-2xl font-bold text-slate-800 mb-6 flex items-center">
+                    <i class="fa-solid fa-link text-indigo-600 ml-3"></i>كيف تربط هذا الموقع بـ Google Sheet الخاص بك؟
+                </h3>
+                
+                <div class="space-y-6 text-slate-600 leading-relaxed">
+                    <!-- Step 1 -->
+                    <div class="flex items-start">
+                        <div class="flex-shrink-0 bg-indigo-100 text-indigo-700 w-8 h-8 rounded-full flex items-center justify-center font-bold ml-4">١</div>
+                        <div>
+                            <h4 class="font-bold text-slate-800 text-lg mb-1">تجهيز وهيكلة ملف البيانات</h4>
+                            <p class="text-sm">تأكد من أن ملف الإكسيل الخاص بك يحتوي على الأعمدة التالية تماماً (بنفس التهجئة) لكي تعمل التحليلات والرسومات البيانية بشكل صحيح:</p>
+                            <ul class="list-disc list-inside mt-2 text-sm text-slate-500 space-y-1">
+                                <li><strong>اسم المشروع</strong> (نصي)</li>
+                                <li><strong>الميزانية</strong> (أرقام فقط بدون عملة)</li>
+                                <li><strong>الحالة</strong> (مكتمل، جاري العمل، تخطيط)</li>
+                                <li><strong>القسم</strong> (اسم القسم مثل: التسويق، التكنولوجيا، إلخ)</li>
+                                <li><strong>تاريخ البدء</strong> (تاريخ بصيغة YYYY-MM-DD)</li>
+                            </ul>
+                        </div>
+                    </div>
+
+                    <!-- Step 2 -->
+                    <div class="flex items-start">
+                        <div class="flex-shrink-0 bg-indigo-100 text-indigo-700 w-8 h-8 rounded-full flex items-center justify-center font-bold ml-4">٢</div>
+                        <div>
+                            <h4 class="font-bold text-slate-800 text-lg mb-1">نشر الملف على الويب بصيغة CSV</h4>
+                            <p class="text-sm">افتح شيت جوجل (Google Sheet) ثم اتبع الآتي:</p>
+                            <ol class="list-decimal list-inside mt-2 text-sm text-slate-500 space-y-1">
+                                <li>اضغط على <strong>ملف (File)</strong> > <strong>مشاركة (Share)</strong> > <strong>النشر على الويب (Publish to web)</strong>.</li>
+                                <li>من القائمة المنسدلة الأولى، اختر الشيت الذي يحتوي على البيانات (أو كامل المستند).</li>
+                                <li>من القائمة المنسدلة الثانية، بدلاً من "صفحة ويب"، اختر <strong>قيم مفصولة بفواصل (CSV)</strong> أو <strong>Comma-separated values (.csv)</strong>.</li>
+                                <li>اضغط على <strong>نشر (Publish)</strong> ثم قم بنسخ الرابط الناتج.</li>
+                            </ol>
+                        </div>
+                    </div>
+
+                    <!-- Step 3 -->
+                    <div class="flex items-start">
+                        <div class="flex-shrink-0 bg-indigo-100 text-indigo-700 w-8 h-8 rounded-full flex items-center justify-center font-bold ml-4">٣</div>
+                        <div>
+                            <h4 class="font-bold text-slate-800 text-lg mb-1">تحديث الرابط في ملف كود الموقع</h4>
+                            <p class="text-sm">افتح ملف <code class="bg-slate-100 px-2 py-0.5 rounded text-indigo-600 font-mono">index.html</code> وابحث عن المتغير:</p>
+                            <pre class="bg-slate-900 text-emerald-400 p-4 rounded-lg font-mono text-xs my-2 text-left" dir="ltr">const GOOGLE_SHEETS_CSV_URL = "YOUR_CSV_URL_HERE";</pre>
+                            <p class="text-sm">استبدل النص <code class="bg-slate-100 px-2 py-0.5 rounded text-indigo-600 font-mono">"YOUR_CSV_URL_HERE"</code> بالرابط الذي نسخته من جوجل شيت، ثم احفظ الملف وارفع التعديلات على GitHub!</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+    </main>
+
+    <!-- Footer -->
+    <footer class="bg-slate-900 text-slate-400 py-8 mt-12 border-t border-slate-800">
+        <div class="max-w-7xl mx-auto px-4 text-center">
+            <p class="text-sm">تطبيق لوحة تحكم المشاريع © 2026 - مستضاف ومجاني عبر GitHub Pages</p>
+        </div>
+    </footer>
+
+    <!-- Main Logic Script -->
+    <script>
+        // ==========================================
+        // 1. CONFIGURATION: PUT YOUR CSV LINK HERE
+        // ==========================================
+        const GOOGLE_SHEETS_CSV_URL = ""; // ضع رابط الـ CSV هنا للربط الفعلي
+
+        // Fallback Mock Data for demo purposes
+        const mockData = [
+            { "اسم المشروع": "تطوير التطبيق الذكي", "الميزانية": 150000, "الحالة": "جاري العمل", "القسم": "التكنولوجيا", "تاريخ البدء": "2026-01-15" },
+            { "اسم المشروع": "الحملة التسويقية الكبرى", "الميزانية": 45000, "الحالة": "مكتمل", "القسم": "التسويق", "تاريخ البدء": "2026-02-01" },
+            { "اسم المشروع": "تحديث البنية التحتية", "الميزانية": 300000, "الحالة": "تخطيط", "القسم": "التشغيل", "تاريخ البدء": "2026-03-10" },
+            { "اسم المشروع": "تدريب الكوادر البشرية", "الميزانية": 25000, "الحالة": "جاري العمل", "القسم": "الموارد البشرية", "تاريخ البدء": "2026-02-15" },
+            { "اسم المشروع": "صيانة الأنظمة الأساسية", "الميزانية": 80000, "الحالة": "مكتمل", "القسم": "التكنولوجيا", "تاريخ البدء": "2026-01-20" },
+            { "اسم المشروع": "تطوير الموقع الإلكتروني", "الميزانية": 60000, "الحالة": "جاري العمل", "القسم": "التكنولوجيا", "تاريخ البدء": "2026-04-01" }
+        ];
+
+        let loadedData = [];
+        let budgetChartInstance = null;
+        let statusChartInstance = null;
+
+        // On Page Load
+        window.onload = function() {
+            if (GOOGLE_SHEETS_CSV_URL && GOOGLE_SHEETS_CSV_URL !== "YOUR_CSV_URL_HERE" && GOOGLE_SHEETS_CSV_URL !== "") {
+                fetchAndParseData(GOOGLE_SHEETS_CSV_URL);
+            } else {
+                console.log("No custom CSV URL set. Displaying fallback/mock data.");
+                document.getElementById('demo-banner').classList.remove('hidden');
+                initDashboard(mockData);
+            }
+        };
+
+        // Fetch data from Google Sheets CSV
+        function fetchAndParseData(url) {
+            Papa.parse(url, {
+                download: true,
+                header: true,
+                dynamicTyping: true,
+                complete: function(results) {
+                    if (results.data && results.data.length > 0) {
+                        // Filter out empty rows if any
+                        loadedData = results.data.filter(row => row["اسم المشروع"]);
+                        document.getElementById('success-banner').classList.remove('hidden');
+                        document.getElementById('demo-banner').classList.add('hidden');
+                        initDashboard(loadedData);
+                    } else {
+                        showError("تم جلب الملف ولكنه فارغ أو مهيكل بطريقة خاطئة.");
+                        initDashboard(mockData);
+                    }
+                },
+                error: function(err) {
+                    console.error("Error fetching/parsing CSV from Google Sheets:", err);
+                    document.getElementById('demo-banner').classList.remove('hidden');
+                    initDashboard(mockData);
+                }
+            });
+        }
+
+        function showError(msg) {
+            alert("حدث خطأ أثناء جلب البيانات: " + msg + " \nسيتم استخدام البيانات التجريبية.");
+        }
+
+        // Initialize Dashboards and Charts
+        function initDashboard(data) {
+            loadedData = data;
+            
+            // Calculate KPIs
+            let totalBudget = 0;
+            let totalProjects = data.length;
+            let completedProjects = 0;
+
+            let departments = {};
+            let statuses = { "مكتمل": 0, "جاري العمل": 0, "تخطيط": 0 };
+
+            data.forEach(row => {
+                // Total budget
+                let budget = parseFloat(row["الميزانية"]) || 0;
+                totalBudget += budget;
+
+                // Completed projects count
+                if (row["الحالة"] === "مكتمل") {
+                    completedProjects++;
+                }
+
+                // Department breakdown
+                let dept = row["القسم"] || "عام";
+                departments[dept] = (departments[dept] || 0) + budget;
+
+                // Status breakdown
+                let stat = row["الحالة"] || "أخرى";
+                if (statuses[stat] !== undefined) {
+                    statuses[stat]++;
+                } else {
+                    statuses[stat] = (statuses[stat] || 0) + 1;
+                }
+            });
+
+            // Update DOM KPIs
+            document.getElementById('stat-total-budget').innerText = totalBudget.toLocaleString('ar-SA') + ' ر.س';
+            document.getElementById('stat-total-projects').innerText = totalProjects;
+            document.getElementById('stat-completed-projects').innerText = completedProjects;
+
+            // Render Charts
+            renderBudgetChart(departments);
+            renderStatusChart(statuses);
+
+            // Populate Table
+            populateTable(data);
+        }
+
+        // Render Bar Chart using Chart.js
+        function renderBudgetChart(departmentsData) {
+            const ctx = document.getElementById('budgetChart').getContext('2d');
+            if (budgetChartInstance) { budgetChartInstance.destroy(); }
+
+            budgetChartInstance = new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: Object.keys(departmentsData),
+                    datasets: [{
+                        label: 'الميزانية بالريال السعودي',
+                        data: Object.values(departmentsData),
+                        backgroundColor: 'rgba(79, 70, 229, 0.85)', // Indigo
+                        borderColor: 'rgb(79, 70, 229)',
+                        borderWidth: 1,
+                        borderRadius: 6
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: { display: false }
+                    },
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            ticks: { font: { family: 'Cairo' } }
+                        },
+                        x: {
+                            ticks: { font: { family: 'Cairo' } }
+                        }
+                    }
+                }
+            });
+        }
+
+        // Render Doughnut Chart using Chart.js
+        function renderStatusChart(statusData) {
+            const ctx = document.getElementById('statusChart').getContext('2d');
+            if (statusChartInstance) { statusChartInstance.destroy(); }
+
+            const colors = {
+                "مكتمل": 'rgba(16, 185, 129, 0.85)', // Emerald
+                "جاري العمل": 'rgba(245, 158, 11, 0.85)', // Amber
+                "تخطيط": 'rgba(99, 102, 241, 0.85)', // Indigo
+                "أخرى": 'rgba(148, 163, 184, 0.85)' // Slate
+            };
+
+            const bgColors = Object.keys(statusData).map(key => colors[key] || colors["أخرى"]);
+
+            statusChartInstance = new Chart(ctx, {
+                type: 'doughnut',
+                data: {
+                    labels: Object.keys(statusData),
+                    datasets: [{
+                        data: Object.values(statusData),
+                        backgroundColor: bgColors,
+                        borderWidth: 1
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            position: 'bottom',
+                            labels: { font: { family: 'Cairo' } }
+                        }
+                    }
+                }
+            });
+        }
+
+        // Populate Raw Data Table
+        function populateTable(data) {
+            const headersRow = document.getElementById('table-headers');
+            const bodyRow = document.getElementById('table-body');
+            
+            headersRow.innerHTML = '';
+            bodyRow.innerHTML = '';
+
+            if (data.length === 0) return;
+
+            // Generate Headers dynamically
+            const columns = Object.keys(data[0]);
+            columns.forEach(col => {
+                const th = document.createElement('th');
+                th.className = "px-6 py-3 text-right text-xs font-semibold text-slate-500 uppercase tracking-wider";
+                th.innerText = col;
+                headersRow.appendChild(th);
+            });
+
+            // Populate rows
+            data.forEach(row => {
+                const tr = document.createElement('tr');
+                tr.className = "hover:bg-slate-50 transition-colors duration-150";
+                
+                columns.forEach(col => {
+                    const td = document.createElement('td');
+                    td.className = "px-6 py-4 whitespace-nowrap text-slate-700";
+                    
+                    let val = row[col];
+                    if (col === "الميزانية" && typeof val === 'number') {
+                        td.innerText = val.toLocaleString('ar-SA') + ' ر.س';
+                    } else if (col === "الحالة") {
+                        // Badge formatting for status
+                        let badgeColor = "bg-slate-100 text-slate-800";
+                        if (val === "مكتمل") badgeColor = "bg-emerald-100 text-emerald-800";
+                        else if (val === "جاري العمل") badgeColor = "bg-amber-100 text-amber-800";
+                        else if (val === "تخطيط") badgeColor = "bg-indigo-100 text-indigo-800";
+                        
+                        td.innerHTML = `<span class="px-2.5 py-1 inline-flex text-xs leading-5 font-semibold rounded-full ${badgeColor}">${val}</span>`;
+                    } else {
+                        td.innerText = val !== null && val !== undefined ? val : '-';
+                    }
+                    tr.appendChild(td);
+                });
+                bodyRow.appendChild(tr);
+            });
+        }
+
+        // Search Filter for Raw Data Table
+        function filterTable() {
+            const query = document.getElementById('table-search').value.toLowerCase();
+            const filtered = loadedData.filter(row => {
+                return Object.values(row).some(val => 
+                    String(val).toLowerCase().includes(query)
+                );
+            });
+            populateTable(filtered);
+        }
+
+        // Handle Tab Switching
+        function switchTab(tabId) {
+            // Hide all contents
+            document.querySelectorAll('.tab-content').forEach(el => el.classList.add('hidden'));
+            // Show selected content
+            document.getElementById('tab-' + tabId).classList.remove('hidden');
+
+            // Reset buttons style
+            document.querySelectorAll('.tab-btn').forEach(btn => {
+                btn.classList.remove('bg-indigo-700', 'text-white');
+                btn.classList.add('text-indigo-200', 'hover:bg-indigo-800');
+            });
+
+            // Highlight selected button
+            const activeBtn = document.getElementById('btn-' + tabId);
+            activeBtn.classList.add('bg-indigo-700', 'text-white');
+            activeBtn.classList.remove('text-indigo-200', 'hover:bg-indigo-800');
+        }
+    </script>
+</body>
+</html>
